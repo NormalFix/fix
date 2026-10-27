@@ -1882,15 +1882,23 @@ async def test_multi_provider_api_adapters_all_seven_vendors(
                     200,
                     {
                         "data": [
-                            {"id": "claude-sonnet-4-5-20250929"},
-                            {"id": "claude-opus-4-1-20250805"},
+                            {"id": "claude-opus-5-5"},
+                            {"id": "claude-sonnet-5-5"},
+                            {"id": "claude-3-5-haiku-latest"},
                         ]
                     },
                 )
             if "api.deepseek.com" in url:
                 return _FakeResponse(
                     200,
-                    {"data": [{"id": "deepseek-chat"}, {"id": "deepseek-reasoner"}]},
+                    {
+                        "data": [
+                            {"id": "deepseek-flash"},
+                            {"id": "deepseek-v4-pro"},
+                            {"id": "deepseek-chat"},
+                            {"id": "deepseek-reasoner"},
+                        ]
+                    },
                 )
             return _FakeResponse(200, {"data": [{"id": "custom-live-model-v1"}]})
 
@@ -1907,7 +1915,7 @@ async def test_multi_provider_api_adapters_all_seven_vendors(
                     200,
                     {
                         "id": "msg_01",
-                        "model": payload.get("model", "claude-sonnet-4-5-20250929"),
+                        "model": payload.get("model", "claude-sonnet-5-5"),
                         "stop_reason": "tool_use",
                         "content": [
                             {"type": "thinking", "thinking": "Inspecting app.py first."},
@@ -1951,8 +1959,9 @@ async def test_multi_provider_api_adapters_all_seven_vendors(
 
     ok_ant, ant_models, _ = await gw.verify_and_fetch_models("anthropic", "sk-ant-valid")
     assert ok_ant is True
-    assert "claude-sonnet-4-5-20250929" in ant_models
-    gw.activate_provider_model("anthropic", "claude-sonnet-4-5-20250929")
+    assert "claude-sonnet-5-5" in ant_models
+    assert "claude-3-5-haiku-latest" not in ant_models
+    gw.activate_provider_model("anthropic", "claude-sonnet-5-5")
 
     # Test Anthropic native `/v1/messages` completion with system, assistant tool_calls, tool_result, and tools schema
     resp_ant = await gw.complete_with_tools(
@@ -2000,8 +2009,10 @@ async def test_multi_provider_api_adapters_all_seven_vendors(
     # 2. Verify MiniMax connection fallback (404 on /models -> 200 on /chat/completions probe) and temperature clamping
     ok_mm, mm_models, _ = await gw.verify_and_fetch_models("minimax", "mm-valid-key")
     assert ok_mm is True
-    assert "MiniMax-M1" in mm_models
-    gw.activate_provider_model("minimax", "MiniMax-M1")
+    assert "MiniMax-M3.1-Flash" in mm_models
+    assert "MiniMax-M3" in mm_models
+    assert "MiniMax-M1" not in mm_models
+    gw.activate_provider_model("minimax", "MiniMax-M3.1-Flash")
     await gw.complete_with_tools(
         messages=[{"role": "user", "content": "hello"}],
         temperature=0.0,  # Must be clamped to >= 0.01 for MiniMax!
@@ -2010,11 +2021,14 @@ async def test_multi_provider_api_adapters_all_seven_vendors(
     assert mm_url == "https://api.minimax.chat/v1/chat/completions"
     assert float(mm_payload["temperature"]) >= 0.01  # type: ignore[arg-type]
 
-    # 3. Verify DeepSeek `deepseek-reasoner` omits temperature and strips non-tool reasoning_content
+    # 3. Verify DeepSeek `deepseek-v4-pro` / `deepseek-flash` filters retired `deepseek-chat`/`deepseek-reasoner`,
+    #    omits temperature on reasoning turns, and strips non-tool reasoning_content when tools=None
     ok_ds, ds_models, _ = await gw.verify_and_fetch_models("deepseek", "ds-valid-key")
     assert ok_ds is True
-    assert "deepseek-reasoner" in ds_models
-    gw.activate_provider_model("deepseek", "deepseek-reasoner")
+    assert ds_models == ["deepseek-flash", "deepseek-v4-pro"]
+    assert "deepseek-chat" not in ds_models
+    assert "deepseek-reasoner" not in ds_models
+    gw.activate_provider_model("deepseek", "deepseek-v4-pro")
     await gw.complete_with_tools(
         messages=[
             {"role": "user", "content": "hi"},
@@ -2029,9 +2043,9 @@ async def test_multi_provider_api_adapters_all_seven_vendors(
     sent_msgs = ds_payload["messages"]  # type: ignore[assignment]
     assert "reasoning_content" not in sent_msgs[1]  # type: ignore[index]
 
-    # 4. Verify OpenAI `o3` uses `max_completion_tokens` and omits `temperature`
+    # 4. Verify OpenAI `gpt-6-astra` / `gpt-6.1-sol` uses `max_completion_tokens` and omits `temperature`
     await gw.verify_and_fetch_models("openai", "sk-openai-valid")
-    gw.activate_provider_model("openai", "o3")
+    gw.activate_provider_model("openai", "gpt-6-astra")
     await gw.complete_with_tools(messages=[{"role": "user", "content": "solve"}])
     _, oa_url, _, oa_payload = captured_requests[-1]
     assert oa_url == "https://api.openai.com/v1/chat/completions"
@@ -2076,8 +2090,8 @@ async def test_connect_and_model_interactive_tui_popup_and_mouse_click_flow(
         if api_key == "invalid-key":
             return False, [], "API Key 认证失败 (HTTP 401)"
         models_map = {
-            "deepseek": ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-pro"],
-            "qwen": ["qwen3-max", "qwen3-coder-plus", "qwq-plus"],
+            "deepseek": ["deepseek-flash", "deepseek-v4-pro"],
+            "qwen": ["qwen3.8-max", "qwen3-coder-plus", "qwen3.7-plus"],
         }
         models = models_map.get(provider_id, ["model-a", "model-b"])
         mock_llm.connected_providers[provider_id] = {
@@ -2161,7 +2175,7 @@ async def test_connect_and_model_interactive_tui_popup_and_mouse_click_flow(
         assert res_ok["ok"] is True
         assert session._modal_state is not None
         assert session._modal_state["mode"] == "connect_select_model"
-        assert session._modal_state["models"] == ["qwen3-max", "qwen3-coder-plus", "qwq-plus"]
+        assert session._modal_state["models"] == ["qwen3.8-max", "qwen3-coder-plus", "qwen3.7-plus"]
 
         # Navigate down 1 row (`qwen3-coder-plus`) with Down arrow and confirm with Enter!
         session.move_modal_selection(1)
@@ -3309,3 +3323,168 @@ def test_version_v1_0_0_beta_and_clean_codebase() -> None:
         content = py_file.read_text(encoding="utf-8")
         assert ("/" + "Users/") not in content, f"Found hardcoded macOS home path in {py_file}"
         assert ("/" + "home/") not in content, f"Found hardcoded Linux home path in {py_file}"
+
+
+def test_latest_2026_official_vendor_models_and_retired_model_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Regression test for `t77u`:
+    1. Verifies all 7 vendors in `PROVIDER_SPECS` match the latest 2026 official API docs:
+       - DeepSeek: `deepseek-flash`, `deepseek-v4-pro` (no `deepseek-chat` or `deepseek-reasoner`)
+       - GLM: `glm-5.3`, `glm-5.3-flash`, `glm-5.3-flashx`, `glm-5.2`, `glm-4.7` (no `glm-4.5` or `glm-4-flash`)
+       - MiMo: `mimo-v2.6-pro`, `mimo-v2.6-flash`, `mimo-v2.6-pro-ultraspeed` (no `mimo-v2-pro` or `mimo-v2.5-pro`)
+       - MiniMax: `MiniMax-M3.1-Flash`, `MiniMax-M3` (no `MiniMax-M1`, `MiniMax-Text-01`, `abab6.5s-chat`)
+       - Qwen: `qwen3.8-max`, `qwen3.7-plus`, `qwen3.8-flash`, `qwen3-coder-plus` (no `qwen3-max`, `qwq-plus`)
+       - OpenAI: `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna` (no `gpt-4.1`, `gpt-4o`, `o3`, `o4-mini`)
+       - Anthropic: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-fable-5-1`, `claude-haiku-5-5` (no `claude-3-5-haiku-latest`)
+    2. Verifies that an existing `~/.fix/llm_providers.json` containing legacy `deepseek-chat` / `deepseek-reasoner`
+       is automatically migrated to `deepseek-flash` / `deepseek-v4-pro` on startup.
+    3. Verifies that OpenAI `/v1/responses` fallback works seamlessly when a GPT-6 model is called with tools.
+    """
+    import asyncio
+    import json
+    import httpx
+    from fix.llm import LLMGateway, PROVIDER_SPECS
+
+    # 1. Verify official model catalogs and absence of retired models
+    assert PROVIDER_SPECS["deepseek"]["default_fast_model"] == "deepseek-flash"
+    assert PROVIDER_SPECS["deepseek"]["default_reasoning_model"] == "deepseek-v4-pro"
+    assert PROVIDER_SPECS["deepseek"]["curated_models"] == ["deepseek-flash", "deepseek-v4-pro"]
+    assert "deepseek-chat" not in PROVIDER_SPECS["deepseek"]["curated_models"]
+    assert "deepseek-reasoner" not in PROVIDER_SPECS["deepseek"]["curated_models"]
+
+    assert PROVIDER_SPECS["glm"]["default_fast_model"] == "glm-5.3-flash"
+    assert PROVIDER_SPECS["glm"]["default_reasoning_model"] == "glm-5.3"
+    assert "glm-5.3" in PROVIDER_SPECS["glm"]["curated_models"]
+    assert "glm-4.5" not in PROVIDER_SPECS["glm"]["curated_models"]
+
+    assert PROVIDER_SPECS["mimo"]["default_fast_model"] == "mimo-v2.6-flash"
+    assert PROVIDER_SPECS["mimo"]["default_reasoning_model"] == "mimo-v2.6-pro"
+    assert PROVIDER_SPECS["mimo"]["curated_models"] == [
+        "mimo-v2.6-pro",
+        "mimo-v2.6-flash",
+        "mimo-v2.6-pro-ultraspeed",
+    ]
+
+    assert PROVIDER_SPECS["minimax"]["default_fast_model"] == "MiniMax-M3.1-Flash"
+    assert PROVIDER_SPECS["minimax"]["default_reasoning_model"] == "MiniMax-M3"
+    assert PROVIDER_SPECS["minimax"]["curated_models"] == ["MiniMax-M3.1-Flash", "MiniMax-M3"]
+
+    assert PROVIDER_SPECS["qwen"]["default_fast_model"] == "qwen3.7-plus"
+    assert PROVIDER_SPECS["qwen"]["default_reasoning_model"] == "qwen3.8-max"
+    assert "qwen3.8-max" in PROVIDER_SPECS["qwen"]["curated_models"]
+    assert "qwen3.7-plus" in PROVIDER_SPECS["qwen"]["curated_models"]
+
+    assert PROVIDER_SPECS["openai"]["default_fast_model"] == "gpt-6.1-sol"
+    assert PROVIDER_SPECS["openai"]["default_reasoning_model"] == "gpt-6-astra"
+    assert "gpt-6-astra" in PROVIDER_SPECS["openai"]["curated_models"]
+    assert "gpt-6.1-sol" in PROVIDER_SPECS["openai"]["curated_models"]
+
+    assert PROVIDER_SPECS["anthropic"]["default_fast_model"] == "claude-sonnet-5-5"
+    assert PROVIDER_SPECS["anthropic"]["default_reasoning_model"] == "claude-opus-5-5"
+    assert "claude-opus-5-5" in PROVIDER_SPECS["anthropic"]["curated_models"]
+    assert "claude-sonnet-5-5" in PROVIDER_SPECS["anthropic"]["curated_models"]
+
+    # 2. Verify automatic migration of legacy `~/.fix/llm_providers.json`
+    cfg_path = tmp_path / "llm_providers.json"
+    cfg_path.write_text(
+        json.dumps(
+            {
+                "active": {
+                    "provider_id": "deepseek",
+                    "api_key": "sk-ds-test",
+                    "base_url": "https://api.deepseek.com/v1",
+                    "fast_model": "deepseek-chat",
+                    "reasoning_model": "deepseek-reasoner",
+                },
+                "connected_providers": {
+                    "deepseek": {
+                        "provider_id": "deepseek",
+                        "api_key": "sk-ds-test",
+                        "base_url": "https://api.deepseek.com/v1",
+                        "models": ["deepseek-chat", "deepseek-reasoner", "deepseek-flash", "deepseek-v4-pro"],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    gw = LLMGateway(providers_config_path=cfg_path)
+    assert gw.provider_id == "deepseek"
+    assert gw.fast_model == "deepseek-flash"
+    assert gw.reasoning_model == "deepseek-v4-pro"
+    assert gw.get_provider_models("deepseek") == ["deepseek-flash", "deepseek-v4-pro"]
+    switchable_names = [m["model"] for m in gw.list_switchable_models()]
+    assert "deepseek-chat" not in switchable_names
+    assert "deepseek-reasoner" not in switchable_names
+    assert switchable_names == ["deepseek-flash", "deepseek-v4-pro"]
+
+    # 3. Verify OpenAI `/v1/responses` fallback when GPT-6 Astra is called with tools
+    class _FakeResp:
+        def __init__(self, status_code: int, data: dict[str, object]) -> None:
+            self.status_code = status_code
+            self._data = data
+
+        def json(self) -> dict[str, object]:
+            return self._data
+
+        def raise_for_status(self) -> None:
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError("err", request=None, response=None)  # type: ignore[arg-type]
+
+    class _MockClient:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> "_MockClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            pass
+
+        async def post(self, url: str, headers: dict[str, str] | None = None, json: dict[str, object] | None = None) -> _FakeResp:
+            if url.endswith("/chat/completions"):
+                return _FakeResp(400, {"error": {"message": "Use Responses API for tools with gpt-6-astra"}})
+            if url.endswith("/responses"):
+                return _FakeResp(
+                    200,
+                    {
+                        "id": "resp_01",
+                        "model": "gpt-6-astra",
+                        "status": "completed",
+                        "output": [
+                            {"type": "reasoning", "summary": [{"type": "summary_text", "text": "Checking files."}]},
+                            {
+                                "type": "function_call",
+                                "call_id": "call_r1",
+                                "name": "read_file",
+                                "arguments": '{"rel_path": "main.py"}',
+                            },
+                        ],
+                        "usage": {"input_tokens": 50, "output_tokens": 20, "output_tokens_details": {"reasoning_tokens": 8}},
+                    },
+                )
+            return _FakeResp(404, {})
+
+    monkeypatch.setattr(httpx, "AsyncClient", _MockClient)
+
+    async def _check_openai_responses() -> None:
+        gw.activate_provider_model("openai", "gpt-6-astra", api_key="sk-oa", base_url="https://api.openai.com/v1")
+        r = await gw.complete_with_tools(
+            messages=[{"role": "user", "content": "inspect main.py"}],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {"name": "read_file", "description": "Read", "parameters": {"type": "object", "properties": {}}},
+                }
+            ],
+        )
+        assert r.reasoning_content == "Checking files."
+        assert len(r.tool_calls) == 1
+        assert r.tool_calls[0].name == "read_file"
+        assert r.tool_calls[0].arguments == {"rel_path": "main.py"}
+
+    asyncio.run(_check_openai_responses())

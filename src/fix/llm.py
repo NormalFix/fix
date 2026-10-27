@@ -31,7 +31,7 @@ class LLMResponse(BaseModel):
     total_tokens: int = 0
 
 
-# Official API specifications for the 7 supported LLM vendors
+# Official API specifications for the 7 supported LLM vendors (synced with latest 2026 official API docs)
 PROVIDER_SPECS: dict[str, dict[str, Any]] = {
     "deepseek": {
         "provider_id": "deepseek",
@@ -42,15 +42,22 @@ PROVIDER_SPECS: dict[str, dict[str, Any]] = {
         "protocol": "openai_chat",
         "auth_style": "bearer",
         "env_keys": ["DEEPSEEK_API_KEY"],
-        "default_fast_model": "deepseek-chat",
-        "default_reasoning_model": "deepseek-reasoner",
+        "default_fast_model": "deepseek-flash",
+        "default_reasoning_model": "deepseek-v4-pro",
         "curated_models": [
+            "deepseek-flash",
+            "deepseek-v4-pro",
+        ],
+        "retired_models": [
             "deepseek-chat",
             "deepseek-reasoner",
-            "deepseek-v4-pro",
-            "deepseek-flash",
+            "deepseek-coder",
+            "deepseek-v4-flash",
+            "deepseek-v4-flash-vision-exp",
+            "deepseek-v3",
+            "deepseek-r1",
         ],
-        "api_notes": "OpenAI 兼容 (/v1/chat/completions, /v1/models) · Bearer 认证 · Reasoner 原生思维链",
+        "api_notes": "OpenAI 兼容 (/v1/chat/completions, /v1/models) · 1M 上下文 · DeepSeek-V4.1-Flash / V4-Pro",
     },
     "glm": {
         "provider_id": "glm",
@@ -61,11 +68,27 @@ PROVIDER_SPECS: dict[str, dict[str, Any]] = {
         "protocol": "openai_chat",
         "auth_style": "bearer",
         "env_keys": ["ZHIPUAI_API_KEY", "GLM_API_KEY", "ZHIPU_API_KEY"],
-        "default_fast_model": "glm-4.5-flash",
-        "default_reasoning_model": "glm-4.5",
+        "default_fast_model": "glm-5.3-flash",
+        "default_reasoning_model": "glm-5.3",
         "curated_models": [
+            "glm-5.3",
+            "glm-5.3-flash",
+            "glm-5.3-flashx",
+            "glm-5.2",
+            "glm-5.1",
+            "glm-5",
+            "glm-5-turbo",
+            "glm-5v-turbo",
+            "glm-4.7",
+            "glm-4.7-flashx",
+            "glm-4.7-flash",
+            "glm-4.6",
+        ],
+        "retired_models": [
             "glm-4.5",
             "glm-4.5-air",
+            "glm-4.5-x",
+            "glm-4.5-airx",
             "glm-4.5-flash",
             "glm-4-plus",
             "glm-4-air",
@@ -74,7 +97,7 @@ PROVIDER_SPECS: dict[str, dict[str, Any]] = {
             "glm-z1-flash",
             "glm-zero-preview",
         ],
-        "api_notes": "智谱 BigModel v4 接口 (/api/paas/v4/chat/completions) · Bearer 认证",
+        "api_notes": "智谱 BigModel v4 接口 (/api/paas/v4/chat/completions) · 1M 上下文 · GLM-5.3 旗舰系列",
     },
     "mimo": {
         "provider_id": "mimo",
@@ -93,30 +116,51 @@ PROVIDER_SPECS: dict[str, dict[str, Any]] = {
         "curated_models": [
             "mimo-v2.6-pro",
             "mimo-v2.6-flash",
+            "mimo-v2.6-pro-ultraspeed",
+        ],
+        "retired_models": [
+            "mimo-v2.5-pro",
+            "mimo-v2.5",
             "mimo-v2-pro",
             "mimo-v2-flash",
             "mimo-vl-7b",
         ],
-        "api_notes": "小米 MiMo 双端点自适应 (Token Plan & api.xiaomimimo.com) · Bearer + api-key 双头认证",
+        "api_notes": "小米 MiMo 双端点自适应 (Token Plan & api.xiaomimimo.com) · 1M 上下文 · MiMo-V2.6 系列",
     },
     "minimax": {
         "provider_id": "minimax",
         "display_name": "MiniMax",
         "vendor_label": "MiniMax (稀宇科技)",
         "base_url": "https://api.minimax.chat/v1",
-        "alt_base_urls": ["https://api.minimax.chat/v1", "https://api.minimaxi.com/v1"],
+        "alt_base_urls": [
+            "https://api.minimax.chat/v1",
+            "https://api.minimaxi.com/v1",
+            "https://api.minimax.io/v1",
+        ],
         "protocol": "openai_chat",
         "auth_style": "bearer",
         "env_keys": ["MINIMAX_API_KEY"],
-        "default_fast_model": "MiniMax-Text-01",
-        "default_reasoning_model": "MiniMax-M1",
+        "default_fast_model": "MiniMax-M3.1-Flash",
+        "default_reasoning_model": "MiniMax-M3",
         "curated_models": [
+            "MiniMax-M3.1-Flash",
+            "MiniMax-M3",
+        ],
+        "retired_models": [
             "MiniMax-M1",
             "MiniMax-Text-01",
             "abab6.5s-chat",
             "DeepSeek-R1",
+            "MiniMax-M2",
+            "MiniMax-M2.1",
+            "MiniMax-M2.1-highspeed",
+            "MiniMax-M2.5",
+            "MiniMax-M2.5-highspeed",
+            "MiniMax-M2.7",
+            "MiniMax-M2.7-highspeed",
+            "M2-her",
         ],
-        "api_notes": "MiniMax OpenAI 兼容 (/v1/chat/completions) · Bearer 认证 · temperature 范围 (0.0, 1.0]",
+        "api_notes": "MiniMax OpenAI 兼容 (/v1/chat/completions) · 1M 上下文 · MiniMax-M3.1-Flash / M3",
     },
     "qwen": {
         "provider_id": "qwen",
@@ -130,40 +174,77 @@ PROVIDER_SPECS: dict[str, dict[str, Any]] = {
         "protocol": "openai_chat",
         "auth_style": "bearer",
         "env_keys": ["DASHSCOPE_API_KEY", "QWEN_API_KEY"],
-        "default_fast_model": "qwen-plus",
-        "default_reasoning_model": "qwen3-max",
+        "default_fast_model": "qwen3.7-plus",
+        "default_reasoning_model": "qwen3.8-max",
         "curated_models": [
-            "qwen3-max",
+            "qwen3.8-max",
+            "qwen3.7-plus",
+            "qwen3.8-flash",
+            "qwen3.7-flash",
+            "qwen3.7-max",
             "qwen3-coder-plus",
-            "qwen-max",
+            "qwen3-coder-flash",
             "qwen-plus",
+            "qwen-flash",
+            "qwen-max",
+        ],
+        "retired_models": [
+            "qwen3-max",
             "qwen-turbo",
             "qwen-coder-plus",
             "qwq-plus",
             "qwq-32b",
+            "qwen2.5-coder-32b-instruct",
         ],
-        "api_notes": "阿里云百炼 DashScope 兼容接口 (/compatible-mode/v1/chat/completions) · Bearer 认证",
+        "api_notes": "阿里云百炼 DashScope 兼容接口 (/compatible-mode/v1/chat/completions) · 1M 上下文 · Qwen3.8 / 3.7 系列",
     },
     "openai": {
         "provider_id": "openai",
         "display_name": "OpenAI",
-        "vendor_label": "OpenAI (GPT / o-series)",
+        "vendor_label": "OpenAI (GPT-6 / GPT-5)",
         "base_url": "https://api.openai.com/v1",
         "alt_base_urls": ["https://api.openai.com/v1"],
         "protocol": "openai_chat",
         "auth_style": "bearer",
         "env_keys": ["OPENAI_API_KEY"],
-        "default_fast_model": "gpt-4.1-mini",
-        "default_reasoning_model": "gpt-4.1",
+        "default_fast_model": "gpt-6.1-sol",
+        "default_reasoning_model": "gpt-6-astra",
         "curated_models": [
+            "gpt-6-astra",
+            "gpt-6.1-sol",
+            "gpt-6.1-terra",
+            "gpt-6-luna",
+            "gpt-6-sol",
+            "gpt-5.6-sol",
+            "gpt-5.6-terra",
+            "gpt-5.6-luna",
+            "gpt-5.5",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.3-codex",
+        ],
+        "retired_models": [
             "gpt-4.1",
             "gpt-4.1-mini",
+            "gpt-4.1-nano",
             "gpt-4o",
             "gpt-4o-mini",
+            "gpt-4-turbo",
+            "gpt-4",
+            "gpt-3.5-turbo",
+            "o1",
+            "o1-mini",
+            "o1-pro",
             "o3",
+            "o3-mini",
+            "o3-pro",
             "o4-mini",
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-5-nano",
+            "gpt-5-pro",
         ],
-        "api_notes": "OpenAI 原生接口 (/v1/chat/completions, /v1/models) · Bearer 认证 · o 系列推理参数自适应",
+        "api_notes": "OpenAI 官方接口 (/v1/chat/completions & /v1/responses) · 1.05M 上下文 · GPT-6 Astra / 6.1 Sol",
     },
     "anthropic": {
         "provider_id": "anthropic",
@@ -174,18 +255,86 @@ PROVIDER_SPECS: dict[str, dict[str, Any]] = {
         "protocol": "anthropic_messages",
         "auth_style": "anthropic_x_api_key",
         "env_keys": ["ANTHROPIC_API_KEY"],
-        "default_fast_model": "claude-sonnet-4-5-20250929",
-        "default_reasoning_model": "claude-opus-4-1-20250805",
+        "default_fast_model": "claude-sonnet-5-5",
+        "default_reasoning_model": "claude-opus-5-5",
         "curated_models": [
+            "claude-opus-5-5",
+            "claude-sonnet-5-5",
+            "claude-fable-5-1",
+            "claude-haiku-5-5",
+            "claude-opus-5",
+            "claude-sonnet-5",
+            "claude-opus-4-8",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+            "claude-haiku-4-5",
+        ],
+        "retired_models": [
             "claude-sonnet-4-5-20250929",
             "claude-opus-4-1-20250805",
             "claude-3-7-sonnet-latest",
             "claude-3-5-sonnet-latest",
             "claude-3-5-haiku-latest",
+            "claude-3-opus-20240229",
         ],
-        "api_notes": "Anthropic 原生接口 (/v1/messages, /v1/models) · x-api-key + anthropic-version 认证",
+        "api_notes": "Anthropic 原生接口 (/v1/messages, /v1/models) · 1M 上下文 · Claude 5.5 / Fable 5.1 系列",
     },
 }
+
+_NON_CHAT_MODEL_KEYWORDS: tuple[str, ...] = (
+    "embedding",
+    "tts",
+    "whisper",
+    "transcribe",
+    "moderation",
+    "rerank",
+    "dall-e",
+    "gpt-image",
+    "image-",
+    "cogview",
+    "cogvideo",
+    "vidu",
+    "speech-",
+    "music-",
+    "hailuo",
+    "babbage",
+    "davinci",
+    "qwen-audio",
+    "qwen-mt",
+    "glm-asr",
+    "glm-tts",
+    "glm-ocr",
+    "glm-image",
+    "wan2",
+    "wan3",
+    "tripo",
+    "happyhorse",
+    "happyoyster",
+)
+
+
+def _filter_and_merge_provider_models(provider_id: str, fetched_ids: list[str]) -> list[str]:
+    """
+    Merge a provider's official `curated_models` with live `/models` IDs while filtering out
+    retired/deprecated model names (e.g. `deepseek-chat`, `deepseek-reasoner`, `MiniMax-M1`)
+    and non-chat models (embeddings, TTS, ASR, image, video, moderation, rerank).
+    Places `curated_models` first so the vendor's latest recommended models always lead the list.
+    """
+    spec = PROVIDER_SPECS.get(provider_id, PROVIDER_SPECS["mimo"])
+    curated = list(spec.get("curated_models") or [])
+    retired_lower = {str(m).lower() for m in (spec.get("retired_models") or [])}
+    valid_fetched: list[str] = []
+    for raw_id in fetched_ids:
+        m = str(raw_id or "").strip()
+        if not m:
+            continue
+        m_low = m.lower()
+        if m_low in retired_lower:
+            continue
+        if any(kw in m_low for kw in _NON_CHAT_MODEL_KEYWORDS):
+            continue
+        valid_fetched.append(m)
+    return list(dict.fromkeys([*curated, *valid_fetched]))
 
 PROVIDER_ORDER: list[str] = [
     "deepseek",
@@ -340,16 +489,26 @@ def _load_fallback_config_from_shell_rc() -> dict[str, str]:
     return found
 
 
-def _detect_default_provider(api_key: str, explicit_base_url: str | None) -> tuple[str, str, str]:
+def _detect_default_provider(
+    api_key: str,
+    explicit_base_url: str | None,
+    rc_cfg: dict[str, str] | None = None,
+) -> tuple[str, str, str]:
     """
     Auto-detect base_url, fast_model, and reasoning_model based on API key format or environment.
     Defaults to Xiaomi MiMo Token Plan (`https://token-plan-cn.xiaomimimo.com/v1`,
-    `mimo-v2.6-flash` / `mimo-v2.6-pro`), while also supporting custom OpenAI-compatible endpoints.
+    `mimo-v2.6-flash` / `mimo-v2.6-pro`), while also supporting all 7 official LLM vendors.
     """
+    rc = rc_cfg or {}
+
+    def _has_key(*names: str) -> bool:
+        return any(bool(os.environ.get(n) or rc.get(n)) for n in names)
+
+    has_fix_key = _has_key("FIX_API_KEY")
     is_mimo_token_plan = api_key.startswith(("tp-", "ttp-"))
-    has_mimo_env = bool(os.environ.get("MIMO_API_KEY") or os.environ.get("XIAOMI_API_KEY"))
-    has_openai_only = bool(os.environ.get("OPENAI_API_KEY")) and not (
-        os.environ.get("FIX_API_KEY") or has_mimo_env or is_mimo_token_plan
+    has_mimo_env = _has_key("MIMO_API_KEY", "XIAOMI_API_KEY")
+    has_openai_only = _has_key("OPENAI_API_KEY") and not (
+        has_fix_key or has_mimo_env or is_mimo_token_plan
     )
 
     if explicit_base_url:
@@ -358,31 +517,24 @@ def _detect_default_provider(api_key: str, explicit_base_url: str | None) -> tup
         base_url = "https://token-plan-cn.xiaomimimo.com/v1"
     elif has_mimo_env:
         base_url = "https://api.xiaomimimo.com/v1"
-    elif os.environ.get("DEEPSEEK_API_KEY") and not os.environ.get("FIX_API_KEY"):
+    elif _has_key("DEEPSEEK_API_KEY") and not has_fix_key:
         base_url = PROVIDER_SPECS["deepseek"]["base_url"]
-    elif (os.environ.get("ZHIPUAI_API_KEY") or os.environ.get("GLM_API_KEY") or os.environ.get("ZHIPU_API_KEY")) and not os.environ.get("FIX_API_KEY"):
+    elif _has_key("ZHIPUAI_API_KEY", "GLM_API_KEY", "ZHIPU_API_KEY") and not has_fix_key:
         base_url = PROVIDER_SPECS["glm"]["base_url"]
-    elif os.environ.get("MINIMAX_API_KEY") and not os.environ.get("FIX_API_KEY"):
+    elif _has_key("MINIMAX_API_KEY") and not has_fix_key:
         base_url = PROVIDER_SPECS["minimax"]["base_url"]
-    elif (os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("QWEN_API_KEY")) and not os.environ.get("FIX_API_KEY"):
+    elif _has_key("DASHSCOPE_API_KEY", "QWEN_API_KEY") and not has_fix_key:
         base_url = PROVIDER_SPECS["qwen"]["base_url"]
-    elif (os.environ.get("ANTHROPIC_API_KEY") or api_key.startswith("sk-ant-")) and not os.environ.get("FIX_API_KEY"):
+    elif (_has_key("ANTHROPIC_API_KEY") or api_key.startswith("sk-ant-")) and not has_fix_key:
         base_url = PROVIDER_SPECS["anthropic"]["base_url"]
     elif has_openai_only:
-        base_url = "https://api.openai.com/v1"
+        base_url = PROVIDER_SPECS["openai"]["base_url"]
     else:
         base_url = "https://token-plan-cn.xiaomimimo.com/v1"
 
     pid = infer_provider_from_url_or_model(base_url)
     spec = PROVIDER_SPECS.get(pid, PROVIDER_SPECS["mimo"])
-    is_mimo = pid == "mimo" or is_mimo_token_plan or has_mimo_env
-    if is_mimo:
-        return base_url, "mimo-v2.6-flash", "mimo-v2.6-pro"
-    if pid != "openai":
-        return base_url, spec["default_fast_model"], spec["default_reasoning_model"]
-    default_fast = "gpt-4o-mini"
-    default_reasoning = default_fast
-    return base_url, default_fast, default_reasoning
+    return base_url, spec["default_fast_model"], spec["default_reasoning_model"]
 
 
 def _convert_openai_to_anthropic_payload(
@@ -469,13 +621,17 @@ def _convert_openai_to_anthropic_payload(
     if not anth_messages:
         anth_messages.append({"role": "user", "content": [{"type": "text", "text": "Hello"}]})
 
-    eff_max_tokens = min(max_tokens or 8192, 8192)
+    eff_max_tokens = min(max_tokens or 16384, 16384)
     payload: dict[str, Any] = {
         "model": model,
         "max_tokens": eff_max_tokens,
         "messages": anth_messages,
-        "temperature": max(0.0, min(1.0, float(temperature))),
     }
+    # Claude 4.7, 4.8, and 5.x (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1) use adaptive thinking
+    # and reject `temperature` with HTTP 400 on `/v1/messages`. Only include `temperature` for legacy models.
+    m_low = model.lower()
+    if not any(tag in m_low for tag in ("-5", "4-7", "4-8", "fable", "mythos")):
+        payload["temperature"] = max(0.0, min(1.0, float(temperature)))
     if system_parts:
         payload["system"] = "\n\n".join(system_parts)
 
@@ -591,12 +747,24 @@ class LLMGateway:
             or os.environ.get("OPENAI_API_KEY")
             or os.environ.get("DEEPSEEK_API_KEY")
             or os.environ.get("ZHIPUAI_API_KEY")
+            or os.environ.get("GLM_API_KEY")
+            or os.environ.get("ZHIPU_API_KEY")
             or os.environ.get("MINIMAX_API_KEY")
             or os.environ.get("DASHSCOPE_API_KEY")
+            or os.environ.get("QWEN_API_KEY")
             or os.environ.get("ANTHROPIC_API_KEY")
             or rc_cfg.get("FIX_API_KEY")
             or rc_cfg.get("MIMO_API_KEY")
             or rc_cfg.get("XIAOMI_API_KEY")
+            or rc_cfg.get("DEEPSEEK_API_KEY")
+            or rc_cfg.get("ZHIPUAI_API_KEY")
+            or rc_cfg.get("GLM_API_KEY")
+            or rc_cfg.get("ZHIPU_API_KEY")
+            or rc_cfg.get("MINIMAX_API_KEY")
+            or rc_cfg.get("DASHSCOPE_API_KEY")
+            or rc_cfg.get("QWEN_API_KEY")
+            or rc_cfg.get("OPENAI_API_KEY")
+            or rc_cfg.get("ANTHROPIC_API_KEY")
             or ""
         )
         env_base = (
@@ -608,16 +776,16 @@ class LLMGateway:
             or rc_cfg.get("FIX_BASE_URL")
             or rc_cfg.get("MIMO_BASE_URL")
         )
-        detected_base, default_fast, default_reasoning = _detect_default_provider(self.api_key, env_base)
+        detected_base, default_fast, default_reasoning = _detect_default_provider(self.api_key, env_base, rc_cfg)
         self.base_url = detected_base
-        self.fast_model = (
+        raw_fast = (
             fast_model
             or saved_active.get("fast_model")
             or os.environ.get("FIX_MODEL")
             or rc_cfg.get("FIX_MODEL")
             or default_fast
         )
-        self.reasoning_model = (
+        raw_reasoning = (
             reasoning_model
             or saved_active.get("reasoning_model")
             or os.environ.get("FIX_REASONING_MODEL")
@@ -625,15 +793,25 @@ class LLMGateway:
             or default_reasoning
         )
         self.provider_id: str = saved_active.get("provider_id") or infer_provider_from_url_or_model(
-            self.base_url, self.fast_model
+            self.base_url, raw_fast
         )
+        if self.provider_id in PROVIDER_SPECS and fast_model is None:
+            spec_init = PROVIDER_SPECS[self.provider_id]
+            retired_init = {str(r).lower() for r in (spec_init.get("retired_models") or [])}
+            if str(raw_fast).lower() in retired_init:
+                raw_fast = spec_init["default_fast_model"]
+            if reasoning_model is None and str(raw_reasoning).lower() in retired_init:
+                raw_reasoning = spec_init["default_reasoning_model"]
+        self.fast_model = raw_fast
+        self.reasoning_model = raw_reasoning
         self.timeout_sec = timeout_sec
         self.last_usage: tuple[int, int, int] = (0, 0, 0)
 
         # Register the initial configured provider into `connected_providers` if API key is present
         if self.api_key and self.provider_id in PROVIDER_SPECS and self.provider_id not in self.connected_providers:
-            spec = PROVIDER_SPECS[self.provider_id]
-            init_models = list(dict.fromkeys([self.fast_model, self.reasoning_model, *spec["curated_models"]]))
+            init_models = _filter_and_merge_provider_models(
+                self.provider_id, [self.fast_model, self.reasoning_model]
+            )
             self.connected_providers[self.provider_id] = {
                 "provider_id": self.provider_id,
                 "api_key": self.api_key,
@@ -647,11 +825,47 @@ class LLMGateway:
         try:
             raw = json.loads(self._providers_config_path.read_text(encoding="utf-8"))
             if isinstance(raw, dict):
+                dirty = False
                 conns = raw.get("connected_providers")
                 if isinstance(conns, dict):
+                    for pid, conn in list(conns.items()):
+                        if isinstance(conn, dict) and pid in PROVIDER_SPECS:
+                            old_list = list(conn.get("models") or [])
+                            new_list = _filter_and_merge_provider_models(pid, old_list)
+                            if new_list != old_list:
+                                conn["models"] = new_list
+                                dirty = True
                     self.connected_providers = conns
                 active = raw.get("active")
                 if isinstance(active, dict):
+                    act_pid = str(
+                        active.get("provider_id")
+                        or infer_provider_from_url_or_model(
+                            str(active.get("base_url") or ""),
+                            str(active.get("fast_model") or ""),
+                        )
+                    )
+                    if act_pid in PROVIDER_SPECS:
+                        spec = PROVIDER_SPECS[act_pid]
+                        retired_low = {str(r).lower() for r in (spec.get("retired_models") or [])}
+                        if str(active.get("fast_model") or "").lower() in retired_low:
+                            active["fast_model"] = spec["default_fast_model"]
+                            dirty = True
+                        if str(active.get("reasoning_model") or "").lower() in retired_low:
+                            active["reasoning_model"] = spec["default_reasoning_model"]
+                            dirty = True
+                    if dirty:
+                        try:
+                            self._providers_config_path.write_text(
+                                json.dumps(
+                                    {"active": active, "connected_providers": self.connected_providers},
+                                    ensure_ascii=False,
+                                    indent=2,
+                                ),
+                                encoding="utf-8",
+                            )
+                        except Exception:
+                            pass
                     return active
         except Exception:
             pass
@@ -692,19 +906,17 @@ class LLMGateway:
         return PROVIDER_SPECS.get(pid, PROVIDER_SPECS["mimo"])
 
     def get_provider_models(self, provider_id: str | None = None) -> list[str]:
-        """Return available models for `provider_id` (combining live API models and curated vendor models)."""
+        """Return available models for `provider_id` (combining curated vendor models and filtered live API models)."""
         pid = provider_id or self.provider_id or infer_provider_from_url_or_model(self.base_url, self.fast_model)
-        spec = PROVIDER_SPECS.get(pid, PROVIDER_SPECS["mimo"])
         conn = self.connected_providers.get(pid) or {}
         live_models = list(conn.get("models") or [])
-        curated = list(spec.get("curated_models") or [])
         extras: list[str] = []
         if pid == self.provider_id:
             if self.fast_model:
                 extras.append(self.fast_model)
             if self.reasoning_model:
                 extras.append(self.reasoning_model)
-        merged = list(dict.fromkeys([*live_models, *curated, *extras]))
+        merged = _filter_and_merge_provider_models(pid, [*live_models, *extras])
         return [m for m in merged if m]
 
     def list_supported_providers(self) -> list[dict[str, Any]]:
@@ -875,7 +1087,7 @@ class LLMGateway:
                                 elif isinstance(item, str):
                                     fetched_ids.append(item)
                         if fetched_ids:
-                            merged_models = list(dict.fromkeys([*fetched_ids, *curated]))
+                            merged_models = _filter_and_merge_provider_models(resolved_pid, fetched_ids)
                             self.connected_providers[resolved_pid] = {
                                 "provider_id": resolved_pid,
                                 "api_key": clean_key,
@@ -903,11 +1115,18 @@ class LLMGateway:
                         }
                     else:
                         probe_url = f"{cand_base}/chat/completions"
-                        probe_payload = {
-                            "model": probe_model,
-                            "max_tokens": 1,
-                            "messages": [{"role": "user", "content": "hi"}],
-                        }
+                        if resolved_pid == "openai" and probe_model.lower().startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")):
+                            probe_payload = {
+                                "model": probe_model,
+                                "max_completion_tokens": 16,
+                                "messages": [{"role": "user", "content": "hi"}],
+                            }
+                        else:
+                            probe_payload = {
+                                "model": probe_model,
+                                "max_tokens": 1,
+                                "messages": [{"role": "user", "content": "hi"}],
+                            }
                         if resolved_pid == "minimax":
                             probe_payload["temperature"] = 0.01
 
@@ -1029,6 +1248,7 @@ class LLMGateway:
         messages: list[dict[str, Any]],
         provider_id: str,
         model: str,
+        has_tools: bool = False,
     ) -> list[dict[str, Any]]:
         """Sanitize historical messages according to vendor-specific OpenAI-compatible protocol rules."""
         if provider_id == "mimo":
@@ -1036,9 +1256,10 @@ class LLMGateway:
         cleaned: list[dict[str, Any]] = []
         for m in messages:
             if m.get("role") == "assistant" and "reasoning_content" in m:
-                # DeepSeek reasoner accepts reasoning_content only on assistant tool_calls turns;
+                # DeepSeek thinking mode requires reasoning_content when tools/tool_calls are active,
+                # and ignores/strips it on non-tool turns without tools;
                 # GLM, Qwen, MiniMax, and OpenAI strict validators reject unexpected reasoning_content on input.
-                if provider_id == "deepseek" and m.get("tool_calls"):
+                if provider_id == "deepseek" and (m.get("tool_calls") or has_tools):
                     cleaned.append(m)
                 else:
                     m_copy = {k: v for k, v in m.items() if k != "reasoning_content"}
@@ -1071,6 +1292,13 @@ class LLMGateway:
                 headers=headers,
                 json=payload,
             )
+            if resp.status_code == 400 and "temperature" in payload:
+                payload.pop("temperature", None)
+                resp = await client.post(
+                    f"{self.base_url}/messages",
+                    headers=headers,
+                    json=payload,
+                )
             if resp.status_code == 400 and payload.get("max_tokens", 0) > 4096:
                 payload["max_tokens"] = 4096
                 resp = await client.post(
@@ -1082,6 +1310,135 @@ class LLMGateway:
             data = resp.json()
 
         return _parse_anthropic_response(data, model=model, messages=messages)
+
+    async def _single_openai_responses_call(
+        self,
+        client: httpx.AsyncClient,
+        headers: dict[str, str],
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None,
+        model: str,
+        max_tokens: int | None,
+    ) -> LLMResponse:
+        """Execute an OpenAI `/v1/responses` call (used by GPT-6 Astra / 6.1 Sol for tool calling)."""
+        system_parts: list[str] = []
+        input_items: list[dict[str, Any]] = []
+        for m in messages:
+            role = m.get("role", "user")
+            content = str(m.get("content") or "")
+            if role == "system":
+                if content:
+                    system_parts.append(content)
+            elif role == "tool":
+                input_items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": str(m.get("tool_call_id") or "call_0"),
+                        "output": content,
+                    }
+                )
+            elif role == "assistant":
+                if content:
+                    input_items.append({"role": "assistant", "content": content})
+                for tc in m.get("tool_calls") or []:
+                    fn = tc.get("function") or {}
+                    raw_args = fn.get("arguments", "{}")
+                    args_str = raw_args if isinstance(raw_args, str) else json.dumps(raw_args, ensure_ascii=False)
+                    input_items.append(
+                        {
+                            "type": "function_call",
+                            "call_id": str(tc.get("id") or "call_0"),
+                            "name": str(fn.get("name") or ""),
+                            "arguments": args_str,
+                        }
+                    )
+            else:
+                input_items.append({"role": "user", "content": content})
+
+        resp_tools: list[dict[str, Any]] = []
+        for t in tools or []:
+            fn = t.get("function") if "function" in t else t
+            if isinstance(fn, dict) and fn.get("name"):
+                resp_tools.append(
+                    {
+                        "type": "function",
+                        "name": str(fn["name"]),
+                        "description": str(fn.get("description") or ""),
+                        "parameters": fn.get("parameters") or {"type": "object", "properties": {}},
+                    }
+                )
+
+        r_payload: dict[str, Any] = {
+            "model": model,
+            "input": input_items or [{"role": "user", "content": "Hello"}],
+        }
+        if system_parts:
+            r_payload["instructions"] = "\n\n".join(system_parts)
+        if resp_tools:
+            r_payload["tools"] = resp_tools
+        if max_tokens is not None:
+            r_payload["max_output_tokens"] = max_tokens
+
+        resp = await client.post(
+            f"{self.base_url}/responses",
+            headers=headers,
+            json=r_payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        content_parts: list[str] = []
+        reasoning_parts: list[str] = []
+        parsed_calls: list[ToolCallRequest] = []
+        for item in data.get("output") or []:
+            if not isinstance(item, dict):
+                continue
+            itype = item.get("type")
+            if itype == "message":
+                for c in item.get("content") or []:
+                    if isinstance(c, dict) and c.get("text"):
+                        content_parts.append(str(c["text"]))
+            elif itype == "reasoning":
+                for s in item.get("summary") or []:
+                    if isinstance(s, dict) and s.get("text"):
+                        reasoning_parts.append(str(s["text"]))
+            elif itype == "function_call":
+                raw_args = item.get("arguments", "{}")
+                try:
+                    args_dict = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                except Exception:
+                    args_dict = {}
+                parsed_calls.append(
+                    ToolCallRequest(
+                        call_id=str(item.get("call_id") or item.get("id") or f"call_{len(parsed_calls)}"),
+                        name=str(item.get("name") or ""),
+                        arguments=args_dict if isinstance(args_dict, dict) else {},
+                    )
+                )
+        if not content_parts and isinstance(data.get("output_text"), str) and data["output_text"]:
+            content_parts.append(data["output_text"])
+
+        content_str = "\n".join(content_parts)
+        reasoning_str = "\n".join(reasoning_parts)
+        usage = data.get("usage") or {}
+        p_tok = int(usage.get("input_tokens") or 0) or _estimate_tokens_from_messages(messages)
+        c_tok = int(usage.get("output_tokens") or 0) or (
+            _estimate_tokens_from_text(content_str + reasoning_str) + len(parsed_calls) * 18
+        )
+        out_details = usage.get("output_tokens_details") or {}
+        r_tok = int(out_details.get("reasoning_tokens") or 0)
+        finish_reason = "tool_calls" if parsed_calls else str(data.get("status") or "stop")
+        return LLMResponse(
+            content=content_str,
+            reasoning_content=reasoning_str,
+            tool_calls=parsed_calls,
+            model=str(data.get("model") or model),
+            finish_reason=finish_reason,
+            reasoning_tokens=r_tok,
+            prompt_tokens=p_tok,
+            completion_tokens=c_tok,
+            total_tokens=p_tok + c_tok,
+        )
 
     async def _single_completion_call(
         self,
@@ -1105,14 +1462,19 @@ class LLMGateway:
                 max_tokens=max_tokens,
             )
 
-        sanitized_messages = self._prepare_openai_messages(messages, active_pid, model)
+        sanitized_messages = self._prepare_openai_messages(
+            messages, active_pid, model, has_tools=bool(tools)
+        )
         payload: dict[str, Any] = {
             "model": model,
             "messages": sanitized_messages,
         }
 
-        is_openai_o_series = active_pid == "openai" and model.lower().startswith(("o1", "o3", "o4"))
-        is_deepseek_reasoner = active_pid == "deepseek" and "reasoner" in model.lower()
+        m_low = model.lower()
+        is_openai_o_series = active_pid == "openai" and m_low.startswith(("o1", "o3", "o4", "gpt-5", "gpt-6"))
+        is_deepseek_reasoner = active_pid == "deepseek" and (
+            use_reasoning or "reasoner" in m_low or "v4-pro" in m_low
+        )
 
         if active_pid == "minimax":
             # MiniMax requires temperature in (0.0, 1.0]; temperature=0.0 is rejected with HTTP 400
@@ -1122,10 +1484,6 @@ class LLMGateway:
 
         if max_tokens is not None:
             eff_max = max_tokens
-            if active_pid == "deepseek" and not is_deepseek_reasoner and eff_max > 8192:
-                eff_max = 8192
-            elif active_pid in ("glm", "qwen", "minimax") and eff_max > 16384:
-                eff_max = 16384
             if is_openai_o_series:
                 payload["max_completion_tokens"] = eff_max
             else:
@@ -1172,6 +1530,16 @@ class LLMGateway:
                     )
                     if resp.status_code < 400:
                         break
+            # OpenAI GPT-6 Astra / 6.1 Sol require /v1/responses when called with tools
+            if resp.status_code == 400 and active_pid == "openai" and tools:
+                return await self._single_openai_responses_call(
+                    client=client,
+                    headers=headers,
+                    messages=sanitized_messages,
+                    tools=tools,
+                    model=model,
+                    max_tokens=max_tokens,
+                )
             resp.raise_for_status()
             data = resp.json()
 
