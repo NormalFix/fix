@@ -7,12 +7,12 @@ import json
 import time
 from typing import Any, Awaitable, Callable
 
-from fix.autonomy import AutonomyRouter
-from fix.context import ContextManager, RepoProfile
-from fix.evolution import EvolutionEngine
+from fix.core.autonomy import AutonomyRouter
+from fix.core.context import ContextManager, RepoProfile
+from fix.core.evolution import EvolutionEngine
 from fix.llm import LLMGateway, LLMResponse
-from fix.memory import DualMemoryStore
-from fix.schema import (
+from fix.memory.store import DualMemoryStore
+from fix.protocol.schema import (
     ProbeDecision,
     ReviewVerdict,
     TaskIntent,
@@ -20,7 +20,7 @@ from fix.schema import (
     TaskSession,
     ToolResult,
 )
-from fix.tools import WorkspaceToolkit, is_test_file_path
+from fix.tools.toolkit import WorkspaceToolkit, is_test_file_path
 
 READONLY_DEDUP_TOOLS = {
     "read_file",

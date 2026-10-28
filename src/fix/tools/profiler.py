@@ -12,7 +12,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from fix.schema import HotspotEntry, ProfileReport
+from fix.protocol.schema import HotspotEntry, ProfileReport
 
 _HARNESS_SCRIPT = r"""
 import cProfile

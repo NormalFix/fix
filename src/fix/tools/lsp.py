@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Iterable
 
-from fix.schema import CallHierarchyReport, DiagnosticItem, SymbolLocation
+from fix.protocol.schema import CallHierarchyReport, DiagnosticItem, SymbolLocation
 
 IGNORE_DIRS = {
     ".git",

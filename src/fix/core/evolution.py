@@ -11,9 +11,9 @@ from collections import Counter
 from itertools import combinations
 from pathlib import Path
 
-from fix.llm import LLMGateway
-from fix.memory import DualMemoryStore
-from fix.schema import (
+from fix.llm.gateway import LLMGateway
+from fix.memory.store import DualMemoryStore
+from fix.protocol.schema import (
     CoChangeEdge,
     CognitiveParadigm,
     DiffAnalysisResult,

@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import xml.etree.ElementTree as ET
-from fix.lsp import SemanticRadar, check_brace_balance_in_source
-from fix.profiler import RuntimeProfiler
-from fix.schema import ToolCallRequest, ToolResult
+from fix.tools.lsp import SemanticRadar, check_brace_balance_in_source
+from fix.tools.profiler import RuntimeProfiler
+from fix.protocol.schema import ToolCallRequest, ToolResult
 
 MAX_OUTPUT_CHARS = 8192
 HEAD_KEEP_CHARS = 2048

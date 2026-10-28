@@ -7,17 +7,17 @@ import time
 from pathlib import Path
 from typing import Callable, Awaitable
 
-from fix.lsp import SemanticRadar
-from fix.memory import DualMemoryStore
-from fix.profiler import RuntimeProfiler
-from fix.schema import (
+from fix.tools.lsp import SemanticRadar
+from fix.memory.store import DualMemoryStore
+from fix.tools.profiler import RuntimeProfiler
+from fix.protocol.schema import (
     AutonomyAssessment,
     AutonomyLevel,
     RuleStatus,
     SandboxComparisonReport,
     TaskIntent,
 )
-from fix.tools import WorkspaceToolkit
+from fix.tools.toolkit import WorkspaceToolkit
 
 
 class AutonomyRouter:

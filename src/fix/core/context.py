@@ -10,8 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from fix.schema import TaskIntent, TaskPhase, TaskSession
-from fix.tools import IGNORE_DIRS
+from fix.protocol.schema import TaskIntent, TaskPhase, TaskSession
+from fix.tools.toolkit import IGNORE_DIRS
 
 EXT_TO_LANG = {
     ".py": "Python",

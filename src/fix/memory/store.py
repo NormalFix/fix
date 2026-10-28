@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Iterable
 
-from fix.schema import (
+from fix.protocol.schema import (
     CoChangeEdge,
     CognitiveParadigm,
     EvidenceFact,

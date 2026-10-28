@@ -9,11 +9,11 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-from fix.evolution import EvolutionEngine
-from fix.llm import LLMGateway
-from fix.lsp import SemanticRadar
-from fix.memory import DualMemoryStore
-from fix.schema import (
+from fix.core.evolution import EvolutionEngine
+from fix.llm.gateway import LLMGateway
+from fix.tools.lsp import SemanticRadar
+from fix.memory.store import DualMemoryStore
+from fix.protocol.schema import (
     EvidenceFact,
     FactStatus,
     IdleBudget,
@@ -23,7 +23,7 @@ from fix.schema import (
     MemoryDelta,
     TaskSession,
 )
-from fix.tools import WorkspaceToolkit
+from fix.tools.toolkit import WorkspaceToolkit
 
 
 class FixLooper:

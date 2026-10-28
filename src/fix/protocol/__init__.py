@@ -1,0 +1,81 @@
+"""Unified protocol schema facade re-exporting all Fix domain models and contracts."""
+
+from __future__ import annotations
+
+from fix.protocol.contracts import (
+    AutonomyAssessment,
+    CallHierarchyReport,
+    ClarifyOption,
+    DiagnosticItem,
+    HotspotEntry,
+    ProbeDecision,
+    ProfileReport,
+    ReviewVerdict,
+    SandboxComparisonReport,
+    SymbolLocation,
+    ToolCallRequest,
+    ToolResult,
+)
+from fix.protocol.enums import (
+    AutonomyLevel,
+    FactStatus,
+    IdleTickKind,
+    RuleStatus,
+    TaskIntent,
+    TaskPhase,
+)
+from fix.protocol.memory_models import (
+    CoChangeEdge,
+    CognitiveParadigm,
+    DiffAnalysisResult,
+    EvidenceFact,
+    MemoryDelta,
+    MentalModel,
+    MetaReflection,
+    OptimizationProposal,
+    SkillCard,
+    StyleRule,
+)
+from fix.protocol.session import (
+    IdleBudget,
+    IdleTick,
+    IdleTickOutcome,
+    TaskBudget,
+    TaskSession,
+)
+
+__all__ = [
+    "AutonomyAssessment",
+    "AutonomyLevel",
+    "CallHierarchyReport",
+    "ClarifyOption",
+    "CoChangeEdge",
+    "CognitiveParadigm",
+    "DiagnosticItem",
+    "DiffAnalysisResult",
+    "EvidenceFact",
+    "FactStatus",
+    "HotspotEntry",
+    "IdleBudget",
+    "IdleTick",
+    "IdleTickKind",
+    "IdleTickOutcome",
+    "MemoryDelta",
+    "MentalModel",
+    "MetaReflection",
+    "OptimizationProposal",
+    "ProbeDecision",
+    "ProfileReport",
+    "ReviewVerdict",
+    "RuleStatus",
+    "SandboxComparisonReport",
+    "SkillCard",
+    "StyleRule",
+    "SymbolLocation",
+    "TaskBudget",
+    "TaskIntent",
+    "TaskPhase",
+    "TaskSession",
+    "ToolCallRequest",
+    "ToolResult",
+]

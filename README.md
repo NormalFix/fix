@@ -94,6 +94,59 @@ fix status
 
 ---
 
+## 🏗️ 项目架构与模块职责划分（Codex-Style Modular Architecture）
+
+`Fix` 采用对标 OpenAI Codex 的 **七层单向依赖领域包架构（Strict Layered Domain Packages）**，`src/fix/` 顶层零散落脚本文件，每个子包职责单一、边界清晰：
+
+```text
+src/fix/
+├── __init__.py              # 包版本元数据与向后兼容模块别名加载器
+├── __main__.py              # 支持 `python -m fix` 直接启动
+├── py.typed                 # PEP 561 静态类型检查标记
+├── protocol/                # [1. 协议与数据契约层] 全局零外部依赖的 Pydantic v2 领域模型
+│   ├── enums.py             # 任务意图 (TaskIntent)、状态机阶段 (TaskPhase)、L1-L4 自治等级枚举
+│   ├── contracts.py         # 工具调用/返回契约、探针决策、独立审查裁决、语义雷达与沙箱报告模型
+│   ├── memory_models.py     # 仓库路标 (EvidenceFact)、心智镜像风格规则、三层心智模型与技能卡模型
+│   ├── session.py           # 会话状态 (TaskSession)、Token/步数安全预算与后台进化队列切片模型
+│   └── schema.py            # 协议层统一导出门面
+├── llm/                     # [2. 多厂商模型网关层] 7 大厂商协议适配与在线模型发现
+│   ├── catalog.py           # 7 大厂商官方规范注册表 (PROVIDER_SPECS)、退役模型过滤与零配置环境变量探测
+│   ├── adapters.py          # OpenAI Chat / Responses 与 Anthropic Messages 协议双向转换器
+│   ├── gateway.py           # 异步多轮工具调用网关 (LLMGateway)、截断自动续写与结构化 JSON 校验
+│   └── mock.py              # 确定性可编程测试替身 (ScriptedMockLLM)
+├── memory/                  # [3. 双层持久化记忆层] SQLite WAL 路标库与个人心智镜像
+│   └── store.py             # DualMemoryStore (<repo>/.fix/repo.db 项目路标 + ~/.fix/persona.db 个人偏好)
+├── tools/                   # [4. Agent-Computer Interface (ACI) 工具与沙箱层]
+│   ├── toolkit.py           # WorkspaceToolkit (文件读取、ripgrep 搜索、AST 门禁补丁、进程组命令执行、Git 懒快照与毫秒级回滚)
+│   ├── lsp.py               # SemanticRadar 跨语言 AST/LSP 符号定义、调用链追踪与括号平衡检查
+│   └── profiler.py          # RuntimeProfiler 运行时 cProfile 性能热点与覆盖率剖析
+├── core/                    # [5. 核心认知与状态机引擎层]
+│   ├── runtime.py           # FixRuntime 六阶段科学认知状态机 (PROBE → REPRODUCE → IMPLEMENT → VERIFY → REVIEW → SYNTHESIZE)
+│   ├── context.py           # ContextManager 0-Token 仓库雷达画像 (RepoProfile) 与动态上下文组装
+│   ├── looper.py            # FixLooper 优先级调度器 (P0 实时用户干预 / P1 主任务 / P2 后台空闲进化)
+│   ├── autonomy.py          # AutonomyRouter (L1-L4 渐进式自治评估) 与 SandboxVerifier (Git Worktree 隔离实证)
+│   └── evolution.py         # EvolutionEngine 第一性原理三层心智模型蒸馏、Git 共变挖掘与可执行技能自举
+├── tui/                     # [6. 全屏终端交互界面层 (Full-Screen Terminal UI)]
+│   ├── theme.py             # Rich Markdown 定制渲染组件、高对比度主题配色与实时终端尺寸同步
+│   ├── composer.py          # Codex 风格输入提示符排版与 `/slash` 命令元数据规范表
+│   ├── tracker.py           # CollapsibleProgressTracker 实时折叠步骤流、Claude 风格动态思考指示器与流式汇总
+│   ├── persistence.py       # SessionPersistenceMixin 项目级隔离输入历史、多轮会话自动快照与 `/resume` 恢复
+│   ├── modals.py            # ModalControllerMixin (`/connect`、`/model`、`/resume` 交互式弹窗与二级参数补全)
+│   ├── commands.py          # SlashCommandRouterMixin 斜杠命令路由分发与交互式任务执行闭环
+│   ├── fullscreen.py        # FullscreenTuiMixin 基于 prompt_toolkit 的全屏交替缓冲区布局、鼠标滚轮/拖拽选区与快捷键状态机
+│   └── session.py           # FixInteractiveSession 交互式会话主控制器
+└── cli/                     # [7. 命令行入口层]
+    └── app.py               # Typer CLI 命令行入口 (`fix`、`fix run`、`fix ask`、`fix bug`、`fix opt`、`fix status` 等)
+```
+
+### 依赖方向约束（Acyclic Dependency Rule）
+```text
+cli  ──▶  tui  ──▶  core  ──▶  { llm, tools, memory }  ──▶  protocol
+```
+底层协议（`protocol`）与基础设施（`llm`、`tools`、`memory`）完全独立于上层 UI（`tui`、`cli`），任何模块均可独立导入、单元测试与复用。
+
+---
+
 ## 🔄 升级与卸载
 
 - **一键升级到最新版本**：
