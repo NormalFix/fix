@@ -45,16 +45,6 @@ fix
 ### 2. 连接大模型厂商（`/connect` 交互式向导）
 进入 `fix` 界面后，直接输入 `/connect` 并回车（或输入 `/` 通过上下方向键选择 `/connect`），即可在弹窗中一键连接 **7 大主流模型厂商**：
 
-| 序号 | 厂商 | 默认快模型 (`fast_model`) | 默认深度推理模型 (`reasoning_model`) | 官方最新支持模型（部分） | 环境变量名（可选） |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `1` | **DeepSeek (深度求索)** | `deepseek-flash` | `deepseek-v4-pro` | `deepseek-flash`, `deepseek-v4-pro` | `DEEPSEEK_API_KEY` |
-| `2` | **GLM (智谱清言 BigModel)** | `glm-5.3-flash` | `glm-5.3` | `glm-5.3`, `glm-5.3-flash`, `glm-5.3-flashx`, `glm-5.2`, `glm-4.7` | `ZHIPUAI_API_KEY` |
-| `3` | **MiMo (小米大模型)** | `mimo-v2.6-flash` | `mimo-v2.6-pro` | `mimo-v2.6-pro`, `mimo-v2.6-flash`, `mimo-v2.6-pro-ultraspeed` | `MIMO_API_KEY` |
-| `4` | **MiniMax (稀宇科技)** | `MiniMax-M3.1-Flash` | `MiniMax-M3` | `MiniMax-M3.1-Flash`, `MiniMax-M3` | `MINIMAX_API_KEY` |
-| `5` | **Qwen (阿里通义千问)** | `qwen3.7-plus` | `qwen3.8-max` | `qwen3.8-max`, `qwen3.7-plus`, `qwen3.8-flash`, `qwen3-coder-plus` | `DASHSCOPE_API_KEY` |
-| `6` | **OpenAI (GPT-6 / GPT-5)** | `gpt-6.1-sol` | `gpt-6-astra` | `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-luna`, `gpt-5.6-sol` | `OPENAI_API_KEY` |
-| `7` | **Anthropic (Claude)** | `claude-sonnet-5-5` | `claude-opus-5-5` | `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-fable-5-1`, `claude-haiku-5-5` | `ANTHROPIC_API_KEY` |
-
 - **交互式三步配置**：输入 `/connect` → 选择厂商 → 粘贴 API Key 自动在线鉴权并拉取可用模型列表 → 选择默认模型，配置自动加密权限保存在 `~/.fix/llm_providers.json`，下次启动免配置。
 - **随时切换模型**：输入 `/model` 打开模型切换弹窗，或直接执行 `/model <模型名>`。
 
