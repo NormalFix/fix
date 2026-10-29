@@ -1,4 +1,4 @@
-# ✦ Fix (`v1.0.0-beta`) — 自主演进的终端 AI 研发搭档
+# ✦ Fix — 自主演进的终端 AI 研发搭档
 
 **Fix** 是一个运行在终端中的全屏交互式 AI 编程与架构分析智能体（Autonomous AI Engineering Partner），具备 **双层心智镜像（Mind Mirror）**、**跨语言零预编译语义雷达（Polyglot Semantic Radar）**、**科学复现与独立审查闭环（Observe → Hypothesize → Reproduce → Fix → Verify → Review）** 以及 **自举式可演进技能（Executable Skills & L1–L4 Autonomy）**。
 
