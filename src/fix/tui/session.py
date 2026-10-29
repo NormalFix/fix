@@ -324,36 +324,79 @@ class FixInteractiveSession(
         return f"{left}{' ' * gap}{right}"
 
     def copy_text_to_clipboard(self, text_to_copy: str, toast_label: str = "✓ 复制成功") -> bool:
-        """Copy arbitrary text to the OS clipboard (pbcopy / xclip / xsel / wl-copy + OSC 52) and show a 3s toast."""
+        """Copy arbitrary text to the OS clipboard (OSC 52 + silent pbcopy / wl-copy / xclip / xsel) and show a 3s toast."""
         if not text_to_copy:
             self.show_toast("暂无可复制内容", duration_sec=3.0)
             return False
         self._last_selected_text = text_to_copy
-        for clip_cmd in (
-            ["pbcopy"],
-            ["wl-copy"],
-            ["xclip", "-selection", "clipboard"],
-            ["xsel", "--clipboard", "--input"],
-        ):
+
+        # 1. Emit OSC 52 clipboard escape sequence first (<0.05ms, works over SSH/tmux/headless & modern terminals)
+        try:
+            import base64
+            from prompt_toolkit.output.defaults import DummyOutput
+
+            b64 = base64.b64encode(text_to_copy.encode("utf-8")).decode("ascii")
+            if len(b64) <= 100000:
+                osc_seq = (
+                    f"\033Ptmux;\033\033]52;c;{b64}\a\033\\"
+                    if os.environ.get("TMUX")
+                    else f"\033]52;c;{b64}\a"
+                )
+                if self._tui_app is not None and getattr(self._tui_app, "output", None) is not None:
+                    if not isinstance(self._tui_app.output, DummyOutput):
+                        self._tui_app.output.write_raw(osc_seq)
+                        self._tui_app.output.flush()
+                else:
+                    raw_out = getattr(sys, "__stdout__", sys.stdout)
+                    if raw_out is not None and hasattr(raw_out, "isatty") and raw_out.isatty():
+                        raw_out.write(osc_seq)
+                        raw_out.flush()
+        except Exception:
+            pass
+
+        # 2. Try native OS clipboard helpers ONLY when their display server is actually active,
+        #    and ALWAYS silence stdout/stderr (DEVNULL) so failed tools (like wl-copy without Wayland)
+        #    NEVER print error messages into the TUI input box or scroll/corrupt the terminal screen!
+        candidate_cmds: list[list[str]] = []
+        if sys.platform == "darwin":
+            candidate_cmds.append(["pbcopy"])
+        else:
+            wayland_disp = os.environ.get("WAYLAND_DISPLAY", "").strip()
+            if wayland_disp:
+                xdg_dir = os.environ.get("XDG_RUNTIME_DIR", "").strip() or (
+                    f"/run/user/{os.getuid()}" if hasattr(os, "getuid") else ""
+                )
+                wl_sock = (Path(xdg_dir) / wayland_disp) if xdg_dir else Path(wayland_disp)
+                if wl_sock.exists():
+                    candidate_cmds.append(["wl-copy"])
+            if os.environ.get("DISPLAY", "").strip():
+                candidate_cmds.append(["xclip", "-selection", "clipboard"])
+                candidate_cmds.append(["xsel", "--clipboard", "--input"])
+
+        for clip_cmd in candidate_cmds:
             if shutil.which(clip_cmd[0]):
                 try:
-                    subprocess.run(clip_cmd, input=text_to_copy, text=True, timeout=2, check=False)
-                    break
+                    proc = subprocess.Popen(
+                        clip_cmd,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True,
+                        close_fds=True,
+                    )
+                    if proc.stdin is not None:
+                        proc.stdin.write(text_to_copy.encode("utf-8"))
+                        proc.stdin.close()
+                    try:
+                        ret = proc.wait(timeout=0.15)
+                        if ret == 0:
+                            break
+                    except subprocess.TimeoutExpired:
+                        # xclip / wl-copy may stay alive in background serving clipboard requests; detach cleanly
+                        break
                 except Exception:
                     pass
-        # Also emit OSC 52 clipboard sequence for terminal emulators (iTerm2, Terminal.app, Warp, kitty, WezTerm)
-        if self._tui_app is not None and getattr(self._tui_app, "output", None) is not None:
-            try:
-                import base64
-                from prompt_toolkit.output.defaults import DummyOutput
 
-                if not isinstance(self._tui_app.output, DummyOutput):
-                    b64 = base64.b64encode(text_to_copy.encode("utf-8")).decode("ascii")
-                    if len(b64) <= 100000:
-                        self._tui_app.output.write_raw(f"\033]52;c;{b64}\a")
-                        self._tui_app.output.flush()
-            except Exception:
-                pass
         self.show_toast(toast_label, duration_sec=3.0)
         return True
 
@@ -445,8 +488,10 @@ class FixInteractiveSession(
 
 
     def _record_and_render_block(self, block_fn: Callable[[Console], None]) -> None:
+        setattr(block_fn, "_cacheable_block", True)
         self._screen_blocks.append(block_fn)
         if len(self._screen_blocks) > 13:
             self._screen_blocks = [self._screen_blocks[0], *self._screen_blocks[-12:]]
-        block_fn(self.console)
+        if not (self._tui_mode and not self._custom_console_passed):
+            block_fn(self.console)
 

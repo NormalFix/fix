@@ -365,6 +365,7 @@ class FixRuntime:
         steer_queue: asyncio.Queue[str] | None = None,
         conversation_context: list[dict[str, str]] | None = None,
         on_event: Callable[[str, dict[str, Any]], None] | None = None,
+        defer_digest: bool = False,
     ) -> TaskSession:
         """Run the full cognitive loop with physical tool gates, deduplication, and guaranteed final synthesis."""
         # Yield immediately so the interactive TUI event loop flushes the user prompt and spinner in <1ms
@@ -437,10 +438,12 @@ class FixRuntime:
                 await self.on_task_complete_hook(session)
             return session
 
-        if self.memory is not None:
-            self.memory.invalidate_stale_facts()
-
         now_ts = time.time()
+        if self.memory is not None:
+            last_inv_ts = getattr(self, "_last_invalidate_facts_ts", 0.0)
+            if (now_ts - last_inv_ts) >= 60.0:
+                self.memory.invalidate_stale_facts()
+                self._last_invalidate_facts_ts = now_ts
         cached_prof = getattr(self, "_cached_repo_profile", None)
         cached_prof_ts = getattr(self, "_cached_repo_profile_ts", 0.0)
         if cached_prof is not None and (now_ts - cached_prof_ts) < 60.0 and cached_prof.repo_root == str(self.toolkit.repo_root.resolve()):
@@ -855,10 +858,20 @@ class FixRuntime:
         )
 
         if self.evolution is not None:
-            self.evolution.digest_completed_task(
-                session=session,
-                head_sha=self.toolkit.get_head_sha(),
+            if session.modified_files and self.memory is not None:
+                self._last_invalidate_facts_ts = 0.0
+            eff_sha = (
+                self.toolkit.get_head_sha()
+                if (session.modified_files or not getattr(profile, "head_sha", ""))
+                else profile.head_sha
             )
+            if defer_digest:
+                setattr(session, "_deferred_digest_sha", eff_sha)
+            else:
+                self.evolution.digest_completed_task(
+                    session=session,
+                    head_sha=eff_sha,
+                )
         if self.on_task_complete_hook is not None:
             await self.on_task_complete_hook(session)
 

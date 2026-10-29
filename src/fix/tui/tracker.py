@@ -209,6 +209,9 @@ class CollapsibleProgressTracker:
         self._last_cols: int = _sync_live_terminal_width(self.console)
         self._tick_idx = 0
 
+    def _is_silent_tui_sink(self) -> bool:
+        return bool(getattr(getattr(self.console, "_file", None), "_is_tui_sink", False))
+
     def _flush_pending_explore_group(self) -> None:
         """Flush accumulated read/search actions into a Codex-style `• Explored` block."""
         if not self._pending_explore_actions:
@@ -217,7 +220,8 @@ class CollapsibleProgressTracker:
         self._pending_explore_actions.clear()
         block = {"type": "explored", "lines": lines}
         self.completed_stream_blocks.append(block)
-        self._render_stream_block_to(self.console, block)
+        if not self._is_silent_tui_sink():
+            self._render_stream_block_to(self.console, block)
 
     @staticmethod
     def _style_explored_line(ln: str) -> Text:
@@ -350,7 +354,8 @@ class CollapsibleProgressTracker:
             if text:
                 blk = {"type": "narrative", "text": text}
                 self.completed_stream_blocks.append(blk)
-                self._render_stream_block_to(self.console, blk)
+                if not self._is_silent_tui_sink():
+                    self._render_stream_block_to(self.console, blk)
             self.current_action_label = "正在执行下一步探索与分析..."
 
         elif event_type == "phase":
@@ -418,13 +423,15 @@ class CollapsibleProgressTracker:
                 ]
                 blk = {"type": "ran", "cmd": cmd_str, "preview_lines": prev_lines}
                 self.completed_stream_blocks.append(blk)
-                self._render_stream_block_to(self.console, blk)
+                if not self._is_silent_tui_sink():
+                    self._render_stream_block_to(self.console, blk)
             elif name in ("apply_patch", "write_new_file") and payload.get("ok"):
                 self._flush_pending_explore_group()
                 rel = str(args.get("rel_path", ""))
                 blk = {"type": "edited", "rel_path": rel}
                 self.completed_stream_blocks.append(blk)
-                self._render_stream_block_to(self.console, blk)
+                if not self._is_silent_tui_sink():
+                    self._render_stream_block_to(self.console, blk)
             self.current_action_label = "正在结合工具输出推理下一步..."
 
         elif event_type == "verify":
@@ -455,7 +462,7 @@ class CollapsibleProgressTracker:
 
     @contextmanager
     def track(self) -> Iterator[Callable[[str, dict[str, Any]], None]]:
-        if self.console.is_terminal:
+        if self.console.is_terminal and getattr(self, "on_tui_invalidate", None) is None:
             with Live(
                 get_renderable=self._get_live_renderable,
                 console=self.console,

@@ -3488,3 +3488,166 @@ def test_latest_2026_official_vendor_models_and_retired_model_cleanup(
         assert r.tool_calls[0].arguments == {"rel_path": "main.py"}
 
     asyncio.run(_check_openai_responses())
+
+
+@pytest.mark.asyncio
+async def test_zero_stutter_block_cache_and_wayland_safe_mouse_selection_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Regression test for `t79u` & `t81u`:
+    1. When `wl-copy` is present on PATH without a valid Wayland socket (or prints
+       `Failed to connect to a Wayland server: No such file or directory` to stderr),
+       mouse selection (`MOUSE_DOWN` -> `MOUSE_MOVE` -> `MOUSE_UP`) copies cleanly via OSC 52,
+       NEVER leaks Wayland stderr text into the terminal/input box, and NEVER freezes the UI.
+    2. Selecting text a second time on a different line immediately clears the previous selection's
+       `bg:#264F78` highlight background from the first line (both in `_ScrollableMainControl` and
+       in `Renderer._last_screen`), and typing or pressing `Escape` also clears any active selection.
+    3. Releasing the mouse button outside the terminal followed by SGR hover (`\x1b[<35;x;yM`)
+       cleanly finalizes `_sel_dragging = False` instead of staying stuck in drag mode.
+    4. Per-block fragment & wrapped-line caching ensures historical turns are not re-rendered
+       when new turns go on screen, while `/steps` / `toggle_turn_steps_collapsed()` still updates immediately.
+    """
+    import shutil
+    import subprocess
+    from io import StringIO
+    from prompt_toolkit.application.current import set_app
+    from prompt_toolkit.data_structures import Point, Size
+    from prompt_toolkit.input import create_pipe_input
+    from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
+    from prompt_toolkit.output.vt100 import Vt100_Output
+    import fix.cli as cli_mod
+    from fix.cli import CleanMarkdown, FixInteractiveSession
+
+    cols, rows = 96, 26
+    monkeypatch.setattr(cli_mod, "_query_os_terminal_size", lambda: (cols, rows))
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setenv("DISPLAY", ":99")
+
+    # Simulate a broken clipboard binary that tries to write Wayland error text to sys.stderr
+    stderr_leaked: list[str] = []
+    popen_calls: list[dict[str, Any]] = []
+
+    from io import BytesIO
+
+    sess = FixInteractiveSession(repo=tmp_path)
+
+    class _FakePopen:
+        def __init__(self, cmd: list[str], **kwargs: Any) -> None:
+            popen_calls.append({"cmd": cmd, "kwargs": kwargs})
+            # Verify stdout and stderr are redirected to DEVNULL so nothing can ever leak to terminal!
+            assert kwargs.get("stdout") == subprocess.DEVNULL
+            assert kwargs.get("stderr") == subprocess.DEVNULL
+            self.stdin = BytesIO()
+            self.returncode = 0
+
+        def wait(self, timeout: float | None = None) -> int:
+            return 0
+
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}" if name in ("wl-copy", "xclip") else None)
+    monkeypatch.setattr(subprocess, "Popen", _FakePopen)
+    sess._tui_mode = True
+    render_call_counts = {"t1": 0, "t2": 0}
+
+    def _turn1_block(c: Any) -> None:
+        render_call_counts["t1"] += 1
+        c.print(CleanMarkdown("第一段上屏文字：用于测试第一次鼠标选中高亮"))
+
+    def _turn2_block(c: Any) -> None:
+        render_call_counts["t2"] += 1
+        c.print(CleanMarkdown("第二段上屏文字：用于测试第二次鼠标选中时前一次高亮立即消失"))
+
+    setattr(_turn1_block, "_cacheable_block", True)
+    setattr(_turn2_block, "_cacheable_block", True)
+    sess._screen_blocks.append(_turn1_block)
+    sess._screen_blocks.append(_turn2_block)
+
+    term_buf = StringIO()
+    vt_out = Vt100_Output(term_buf, lambda: Size(rows=rows, columns=cols))
+    with create_pipe_input() as pipe_in:
+        app = sess.build_fullscreen_tui_app(pt_input=pipe_in, pt_output=vt_out)
+
+        def _render_now() -> None:
+            with set_app(app):
+                app.renderer.render(app, app.layout)
+
+        _render_now()
+        assert render_call_counts["t1"] == 1
+        assert render_call_counts["t2"] == 1
+
+        # Re-rendering or appending a new block must NOT re-execute already cached blocks t1 & t2
+        def _turn3_block(c: Any) -> None:
+            c.print(CleanMarkdown("第三段新增上屏文字：验证历史区块零重复渲染"))
+
+        setattr(_turn3_block, "_cacheable_block", True)
+        sess._screen_blocks.append(_turn3_block)
+        _render_now()
+        assert render_call_counts["t1"] == 1
+        assert render_call_counts["t2"] == 1
+
+        # Locate document rows for turn 1 and turn 2
+        line_t1 = next(
+            i for i, ln in enumerate(sess._cached_render_lines)
+            if "第一段上屏文字" in "".join(seg for _, seg in ln)
+        )
+        line_t2 = next(
+            i for i, ln in enumerate(sess._cached_render_lines)
+            if "第二段上屏文字" in "".join(seg for _, seg in ln)
+        )
+
+        # 1. Select text on `line_t1`
+        sess.handle_tui_mouse_event(
+            MouseEvent(Point(0, line_t1), MouseEventType.MOUSE_DOWN, MouseButton.LEFT, frozenset()),
+            source="screen",
+        )
+        sess.handle_tui_mouse_event(
+            MouseEvent(Point(14, line_t1), MouseEventType.MOUSE_MOVE, MouseButton.LEFT, frozenset()),
+            source="screen",
+        )
+        _render_now()
+        sc = app.renderer._last_screen
+        assert sc is not None
+        assert any("bg:#264F78" in sc.data_buffer[line_t1][x].style for x in range(16))
+
+        sess.handle_tui_mouse_event(
+            MouseEvent(Point(14, line_t1), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset()),
+            source="screen",
+        )
+        _render_now()
+        assert sess._last_selected_text == "第一段上屏文字"
+        # Verify wl-copy was NEVER invoked because WAYLAND_DISPLAY is unset, and xclip used DEVNULL
+        assert all(c["cmd"][0] != "wl-copy" for c in popen_calls)
+        assert "Wayland" not in term_buf.getvalue()
+        assert sess._input_buffer_ref.text == ""
+
+        # 2. Select text a second time on `line_t2` -> highlight on `line_t1` MUST disappear immediately!
+        sess.handle_tui_mouse_event(
+            MouseEvent(Point(0, line_t2), MouseEventType.MOUSE_DOWN, MouseButton.LEFT, frozenset()),
+            source="screen",
+        )
+        sess.handle_tui_mouse_event(
+            MouseEvent(Point(14, line_t2), MouseEventType.MOUSE_MOVE, MouseButton.LEFT, frozenset()),
+            source="screen",
+        )
+        _render_now()
+        sc2 = app.renderer._last_screen
+        assert sc2 is not None
+        assert not any("bg:#264F78" in sc2.data_buffer[line_t1][x].style for x in range(cols)), (
+            "Previous selection highlight on line_t1 did not disappear!"
+        )
+        assert any("bg:#264F78" in sc2.data_buffer[line_t2][x].style for x in range(16))
+
+        # 3. Simulate SGR hover motion (`35;x;yM`, button=NONE) arriving after button release outside window
+        kb_mouse = next(b.handler for b in app.key_bindings.bindings if b.keys == ("<vt100-mouse-event>",))
+        from types import SimpleNamespace
+        kb_mouse(SimpleNamespace(data=f"\x1b[<35;15;{line_t2 + 1}M", app=app))
+        assert sess._sel_dragging is False
+        assert sess._last_selected_text == "第二段上屏文字"
+
+        # 4. Typing in the input box immediately clears the main window selection highlight
+        sess._input_buffer_ref.insert_text("a")
+        _render_now()
+        sc3 = app.renderer._last_screen
+        assert sc3 is not None
+        assert not any("bg:#264F78" in sc3.data_buffer[line_t2][x].style for x in range(cols))

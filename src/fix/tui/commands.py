@@ -218,6 +218,7 @@ class SlashCommandRouterMixin:
                         for p_args, p_kwargs in _calls:
                             c.print(*p_args, **p_kwargs)
 
+                    setattr(_replay_slash_turn, "_cacheable_block", True)
                     self._screen_blocks.append(_replay_slash_turn)
                     if len(self._screen_blocks) > 13:
                         self._screen_blocks = [self._screen_blocks[0], *self._screen_blocks[-12:]]
@@ -902,6 +903,7 @@ class SlashCommandRouterMixin:
                         steer_queue=self.looper.p0_steer_queue,
                         conversation_context=self.conversation_context,
                         on_event=on_event,
+                        defer_digest=self._tui_mode,
                     )
                 )
         except (KeyboardInterrupt, asyncio.CancelledError):
@@ -1001,11 +1003,22 @@ class SlashCommandRouterMixin:
             fold_state=fold_state,
         )
 
+        self._scroll_offset_from_bottom = 0
         self._screen_blocks.append(_render_turn_with_prompt)
         if len(self._screen_blocks) > 13:
             self._screen_blocks = [self._screen_blocks[0], *self._screen_blocks[-12:]]
 
-        _render_completed_turn(self.console)
+        if self._tui_app is not None:
+            try:
+                self._tui_app.invalidate()
+                if getattr(self._tui_app, "_is_running", False):
+                    self._tui_app._redraw()
+            except Exception:
+                pass
+            await asyncio.sleep(0)
+
+        if not (self._tui_mode and not self._custom_console_passed):
+            _render_completed_turn(self.console)
         self.conversation_context.append(
             {
                 "user": user_prompt,
@@ -1031,6 +1044,13 @@ class SlashCommandRouterMixin:
                 "timestamp": time.time(),
             }
         )
+        deferred_sha = getattr(session, "_deferred_digest_sha", None)
+        if deferred_sha is not None and self.evolution is not None:
+            delattr(session, "_deferred_digest_sha")
+            self.evolution.digest_completed_task(
+                session=session,
+                head_sha=str(deferred_sha),
+            )
         self._persist_current_conversation_session()
         return session
 

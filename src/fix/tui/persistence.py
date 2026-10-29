@@ -210,6 +210,9 @@ class SessionPersistenceMixin:
                     CollapsibleProgressTracker._render_stream_block_to(c, blk)
             _render_session_result(completed_sess, c, show_telemetry=not self._tui_mode)
 
+        setattr(_render_turn_with_prompt, "_cacheable_block", True)
+        setattr(_render_turn_with_prompt, "_turn_id", turn_id)
+        setattr(_render_turn_with_prompt, "_fold_state", fold_state)
         return _render_turn_with_prompt
 
     def open_resume_modal(self) -> bool:

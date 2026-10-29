@@ -287,7 +287,11 @@ class FullscreenTuiMixin:
         self._cached_completed_frags: list[tuple[str, str]] = []
         self._cached_lines_key: Any = None
         self._cached_wrapped_lines: list[list[tuple[str, str]]] = []
+        self._cached_active_key: Any = None
+        self._cached_active_lines: list[list[tuple[str, str]]] = []
         self._cached_total_main_lines: int = 0
+        _input_spans_cache: dict[tuple[str, int, int], list[tuple[int, int]]] = {}
+        _per_block_lines_cache: dict[tuple[Any, ...], list[list[tuple[str, str]]]] = {}
 
         if not self._custom_console_passed:
             self._tui_Sink = StringIO()
@@ -298,38 +302,6 @@ class FullscreenTuiMixin:
             self._screen_blocks.append(self._render_minimal_header_to)
 
         self.history_file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        slash_meta = {
-            "/help": "查看所有交互命令说明",
-            "/status": "查看项目技术栈、模型与地标状态",
-            "/steps": "展开查看上一轮任务工具调用明细",
-            "/ask": "只读架构分析与代码问答 ([file:line])",
-            "/bug": "科学闭环排查与修复 Bug",
-            "/opt": "性能与架构优化轨道",
-            "/trace": "LSP/AST 跨文件符号调用链追踪",
-            "/diag": "运行静态语法与导入诊断",
-            "/profile": "运行 cProfile 性能热点剖析",
-            "/idle": "查看或运行后台 IdleHandler 进化队列",
-            "/evolve": "查看三层第一性原理心智模型与优化提案",
-            "/insights": "查看三层第一性原理心智模型与优化提案",
-            "/autonomy": "查看 L1-L4 渐进式自治评分",
-            "/sandbox": "Git Worktree 隔离沙箱回归验证",
-            "/rules": "管理个人开发风格规则 (Mind Mirror)",
-            "/landmarks": "查看已验证的项目架构地标",
-            "/skills": "查看、生成或执行项目专属诊断技能",
-            "/learn": "从最近一次 Git 提交学习代码风格",
-            "/diff": "查看当前工作区 Git Diff",
-            "/undo": "一键回滚上一轮任务代码修改",
-            "/copy": "复制上一轮回答到系统剪贴板",
-            "/new": "在当前目录新建对话 (原对话自动保存至 /resume)",
-            "/clear": "清空当前会话多轮上下文",
-            "/resume": "恢复当前目录的历史对话并保持在最新对话位置",
-            "/model": "查看当前支持切换的大模型列表或切换模型",
-            "/connect": "连接其他大模型厂商 (DeepSeek/GLM/MiMo/MiniMax/Qwen/OpenAI/Anthropic)",
-            "/init": "初始化 .fix/ 并扫描 Git 共变关系",
-            "/exit": "退出 Fix 交互终端",
-            "/quit": "退出 Fix 交互终端",
-        }
 
         class _SlashCommandCompleter(Completer):
             def get_completions(self_, document: Any, complete_event: Any) -> Iterator[Completion]:
@@ -612,6 +584,10 @@ class FullscreenTuiMixin:
             nonlocal normalizing_guard
             if not history_nav_guard:
                 self._browsing_history = False
+            if self._sel_anchor is not None or self._sel_head is not None:
+                self._sel_anchor = None
+                self._sel_head = None
+                self._sel_dragging = False
             if self._modal_state is not None:
                 mode_m = self._modal_state.get("mode")
                 if mode_m == "connect_api_key":
@@ -763,6 +739,10 @@ class FullscreenTuiMixin:
             txt = input_buffer.text
             if not txt:
                 return [(0, 0)]
+            cache_k = (txt, cols, right_margin_w)
+            cached_sp = _input_spans_cache.get(cache_k)
+            if cached_sp is not None:
+                return cached_sp
             width = max(16, cols - right_margin_w)
             spans: list[tuple[int, int]] = []
             pos = 0
@@ -787,7 +767,11 @@ class FullscreenTuiMixin:
                 else:
                     spans.append((seg_start, line_end))
                 pos = line_end + (1 if idx_ln < len(raw_lines) - 1 else 0)
-            return spans or [(0, 0)]
+            res_spans = spans or [(0, 0)]
+            if len(_input_spans_cache) > 16:
+                _input_spans_cache.clear()
+            _input_spans_cache[cache_k] = res_spans
+            return res_spans
 
         def _find_cursor_visual_row(spans: list[tuple[int, int]], cur_pos: int) -> int:
             cur_row = len(spans) - 1
@@ -982,28 +966,73 @@ class FullscreenTuiMixin:
                 )
                 self._cached_completed_key = completed_key
 
+            lines_key = (completed_key, max_line_cells)
+            if lines_key != self._cached_lines_key:
+                from fix.tui.theme import _get_block_cache_key, _render_single_block_to_pt_fragments
+
+                wrapped_blocks: list[list[tuple[str, str]]] = []
+                n_blks = len(self._screen_blocks)
+                for idx_b, fn_b in enumerate(self._screen_blocks):
+                    b_ckey = _get_block_cache_key(fn_b, cols)
+                    l_ckey = (b_ckey, max_line_cells) if b_ckey is not None else None
+                    b_frags = _render_single_block_to_pt_fragments(fn_b, cols)
+                    if b_frags == [("", "")]:
+                        continue
+                    b_lines = _per_block_lines_cache.get(l_ckey) if l_ckey is not None else None
+                    if b_lines is None:
+                        b_lines = _wrap_fragments_into_lines(b_frags, max_line_cells=max_line_cells)
+                        if l_ckey is not None:
+                            if len(_per_block_lines_cache) > 256:
+                                _per_block_lines_cache.clear()
+                            _per_block_lines_cache[l_ckey] = b_lines
+                    if (
+                        idx_b < n_blks - 1
+                        and b_lines
+                        and b_lines[-1] == []
+                        and b_frags
+                        and b_frags[-1][1].endswith("\n")
+                    ):
+                        wrapped_blocks.extend(b_lines[:-1])
+                    else:
+                        wrapped_blocks.extend(b_lines)
+                self._cached_wrapped_lines = wrapped_blocks or [[]]
+                self._cached_lines_key = lines_key
+
             if self._active_tracker is None and not self._inflight_prompt:
-                lines_key = (completed_key, max_line_cells)
-                if lines_key != self._cached_lines_key:
-                    self._cached_wrapped_lines = _wrap_fragments_into_lines(
-                        self._cached_completed_frags,
-                        max_line_cells=max_line_cells,
-                    )
-                    self._cached_lines_key = lines_key
                 lines = self._cached_wrapped_lines
             else:
-                active_frags = _render_blocks_to_pt_fragments(
-                    blocks=[],
-                    width=cols,
-                    active_tracker=self._active_tracker,
-                    inflight_prompt=self._inflight_prompt,
-                    repo_name=repo_name,
+                tr_obj = self._active_tracker
+                active_key = (
+                    cols,
+                    max_line_cells,
+                    self._inflight_prompt,
+                    id(tr_obj),
+                    len(tr_obj.completed_stream_blocks) if tr_obj is not None else 0,
+                    tuple(tr_obj._pending_explore_actions) if tr_obj is not None else (),
                 )
-                combined_frags = list(self._cached_completed_frags)
-                if combined_frags and active_frags and not combined_frags[-1][1].endswith("\n"):
-                    combined_frags.append(("", "\n"))
-                combined_frags.extend(active_frags)
-                lines = _wrap_fragments_into_lines(combined_frags, max_line_cells=max_line_cells)
+                if active_key != self._cached_active_key:
+                    active_frags = _render_blocks_to_pt_fragments(
+                        blocks=[],
+                        width=cols,
+                        active_tracker=tr_obj,
+                        inflight_prompt=self._inflight_prompt,
+                        repo_name=repo_name,
+                    )
+                    self._cached_active_lines = _wrap_fragments_into_lines(
+                        active_frags,
+                        max_line_cells=max_line_cells,
+                    )
+                    self._cached_active_key = active_key
+                base_lines = self._cached_wrapped_lines
+                if (
+                    base_lines
+                    and base_lines[-1] == []
+                    and self._cached_completed_frags
+                    and self._cached_completed_frags[-1][1].endswith("\n")
+                ):
+                    lines = base_lines[:-1] + self._cached_active_lines
+                else:
+                    lines = base_lines + self._cached_active_lines
 
             total_lines = len(lines)
             self._cached_total_main_lines = total_lines
@@ -1548,6 +1577,7 @@ class FullscreenTuiMixin:
         class _LiveFormattedTextControl(FormattedTextControl):
             def create_content(self, width: int, height: int) -> Any:
                 self._fragment_cache.clear()
+                self._content_cache.clear()
                 return super().create_content(width, height)
 
         status_row = Window(
@@ -1769,7 +1799,12 @@ class FullscreenTuiMixin:
                     self._tui_app.invalidate()
                 return
 
-            self.record_input_history(raw_line)
+            self._sel_anchor = None
+            self._sel_head = None
+            self._sel_dragging = False
+            self._input_sel_anchor = None
+            self._input_sel_head = None
+            self._input_sel_dragging = False
             input_buffer.reset()
             self._scroll_offset_from_bottom = 0
             self._agent_state_label = "正在执行"
@@ -1784,6 +1819,12 @@ class FullscreenTuiMixin:
                 self._active_tracker = pre_tracker
             if self._tui_app is not None:
                 self._tui_app.invalidate()
+                if getattr(self._tui_app, "_is_running", False):
+                    try:
+                        self._tui_app._redraw()
+                    except Exception:
+                        pass
+            self.record_input_history(raw_line)
 
             async def _bg_runner() -> None:
                 self._agent_state_label = "正在执行"
@@ -2148,7 +2189,24 @@ class FullscreenTuiMixin:
                             self._tui_app.invalidate()
                         return None
                 if not (self._sel_dragging or self._input_sel_dragging):
-                    return NotImplemented
+                    if mouse_event.button == MouseButton.LEFT:
+                        if source != "main" and y >= avail_h + 1:
+                            self._sel_anchor = None
+                            self._sel_head = None
+                            c_pos = _screen_xy_to_input_char_pos(x, max(input_start_y, y))
+                            self._input_sel_anchor = c_pos
+                            self._input_sel_head = c_pos
+                            self._input_sel_dragging = True
+                        else:
+                            self._input_sel_anchor = None
+                            self._input_sel_head = None
+                            doc_pos = _screen_xy_to_main_doc_pos(x, y)
+                            self._sel_anchor = doc_pos
+                            self._sel_head = doc_pos
+                            self._sel_dragging = True
+                        _ensure_drag_autoscroll_ticker()
+                    else:
+                        return NotImplemented
                 self._sel_last_xy = (x, y)
                 changed_drag = False
                 if self._sel_dragging:
@@ -2247,8 +2305,9 @@ class FullscreenTuiMixin:
 
         class _ScrollableMainControl(FormattedTextControl):
             def create_content(self, width: int, height: int) -> Any:
-                # Reset _fragment_cache so dynamic scroll offset and terminal width updates always render fresh
+                # Reset both _fragment_cache and _content_cache so selection highlights and scroll updates always render fresh
                 self._fragment_cache.clear()
+                self._content_cache.clear()
                 return super().create_content(width, height)
 
             def mouse_handler(self, mouse_event: MouseEvent) -> Any:
@@ -2313,17 +2372,35 @@ class FullscreenTuiMixin:
                     return NotImplemented
                 m_suffix = data_s[-1]
                 if sgr:
-                    try:
-                        m_btn, m_type, m_mods = xterm_sgr_mouse_events[mouse_ev_code, m_suffix]
-                    except KeyError:
-                        # SGR Any-Event Tracking (`?1003h`) emits motion with no button pressed as `35;x;yM`
-                        # or `35;x;ym` (or `35 + modifier_bits`).
-                        if mouse_ev_code & 32:
-                            m_btn = UNKNOWN_BUTTON
-                            m_type = MouseEventType.MOUSE_MOVE
-                            m_mods = UNKNOWN_MODIFIER
-                        else:
-                            return NotImplemented
+                    if m_suffix == "m":
+                        m_btn = MouseButton.LEFT
+                        m_type = MouseEventType.MOUSE_UP
+                        m_mods = (
+                            frozenset({MouseModifier.SHIFT})
+                            if (mouse_ev_code & 4)
+                            else frozenset()
+                        )
+                    else:
+                        try:
+                            m_btn, m_type, m_mods = xterm_sgr_mouse_events[mouse_ev_code, m_suffix]
+                        except KeyError:
+                            if (mouse_ev_code & 3) == 3 and not (mouse_ev_code & 32):
+                                m_btn = MouseButton.LEFT
+                                m_type = MouseEventType.MOUSE_UP
+                                m_mods = frozenset()
+                            elif mouse_ev_code & 32:
+                                m_btn = MouseButton.NONE if (mouse_ev_code & 3) == 3 else MouseButton.LEFT
+                                m_type = MouseEventType.MOUSE_MOVE
+                                m_mods = UNKNOWN_MODIFIER
+                            else:
+                                return NotImplemented
+                    # If button was released outside window and terminal now sends hover motion (code & 3 == 3), finalize drag
+                    if (
+                        m_type == MouseEventType.MOUSE_MOVE
+                        and (mouse_ev_code & 3) == 3
+                        and (self._sel_dragging or self._input_sel_dragging)
+                    ):
+                        m_type = MouseEventType.MOUSE_UP
                 else:
                     m_btn, m_type, m_mods = urxvt_mouse_events.get(
                         mouse_ev_code,
@@ -2361,8 +2438,12 @@ class FullscreenTuiMixin:
             _sync_input_viewport(*_get_live_tui_dimensions())
             event.app.invalidate()
 
-        @kb.add("escape")
+        @kb.add("escape", eager=True)
         def _on_escape(event: Any) -> None:
+            if self._sel_anchor is not None or self._sel_head is not None:
+                self._sel_anchor = None
+                self._sel_head = None
+                self._sel_dragging = False
             if self._modal_state is not None:
                 self.close_modal("已取消弹窗操作")
                 event.app.invalidate()
@@ -2806,10 +2887,13 @@ class FullscreenTuiMixin:
             full_screen=True,
             mouse_support=True,
             color_depth=ColorDepth.TRUE_COLOR,
+            max_render_postpone_time=None,
             refresh_interval=0.5,
             input=pt_input,
             output=pt_output,
         )
+        app_instance.ttimeoutlen = 0.05
+        app_instance.timeoutlen = 0.25
         # Enable SGR Button-Event Mouse Tracking (`?1000h?1002h?1015h?1006h`) instead of Any-Event (`?1003h`)
         # so mouse click, drag-to-select (with automatic edge scrolling across multiple screens!), and wheel/trackpad
         # scrolling work with 0% idle hover CPU!
